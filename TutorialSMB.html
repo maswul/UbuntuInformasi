@@ -1,0 +1,150 @@
+Asal Link = https://websiteforstudents.com/lesson-12-create-samba-shares-ubuntu-windows-systems/
+
+Step 1: Prerequisites
+
+Our first task is to define our goal and scope.
+
+Ubuntu machine name = ubsrv
+Machine IP address = 192.168.71.131
+Shares = Samba
+Share2 = /Samba/Allaccess
+Share3 = /Samba/Allaccess/Secure
+Workgroup = WORKGROUP
+
+Step 2: Configure Windows host file with Ubuntu host IP
+
+If DNS is involved then you can skip this. However, if you’re running this from your lab environment without DNS, then you’ll want to add Ubuntu machine hostname and IP address to Windows host file.
+
+On Windows computer, open the command prompt as administrator and run the commands below.
+
+notepad C:\Windows\System32\drivers\etc\hosts
+
+Then add the line below at the end of the file.
+
+192.168.71.131                              ubsrv
+
+Also, make sure the Windows computer is a member of WORKGROUP. By default, it is.
+Step 3: Install Samba Packages
+
+The next step is to install Samba packages on the Ubuntu system. To do that, run the commands below.
+
+sudo apt update && sudo apt install -y samba samba-common python-glade2 system-config-samba
+
+Step 4: Configure Samba Global options
+
+Now that Samba is installed, go and configure and define Samba global options. First thing is to backup the original Samba configuration file. To do that, run the commands below.
+
+sudo mv /etc/samba/smb.conf /etc/samba/smb.conf.bak
+
+Then run the commands below to create a new Samba config file.
+
+sudo nano /etc/samba/smb.conf
+
+In the new file, create a global configuration block, configure it like what shown below and save the file.
+
+[global]
+workgroup = WORKGROUP
+server string = Samba Server %v
+netbios name = ubsrv
+security = user
+map to guest = bad user
+name resolve order = bcast host
+dns proxy = no
+
+Step 5: Create Samba Folders
+
+Next, go and create the samba shares. The one command line below create all three folders.
+
+sudo mkdir -p /Samba/Allaccess/Secure
+
+Next, grant everyone access to the Allaccess folder. To grant everyone access to the folder, run the commands below.
+
+cd /Samba
+sudo chmod -R 0755 Allaccess/
+sudo chown -R nobody:nogroup Allaccess/
+
+Step 6: Share the folder via samba
+
+Now that you’ve created the folders and have given access to everyone, go back to Samba configuration file and enable sharing on that folder.
+
+Open Samba config file again and paste the above below the [global] block.
+
+sudo nano /etc/samba/smb.conf
+
+Then copy and paste the block below into the file and save.
+
+[Allaccess]
+path = /Samba/Allaccess
+browsable = yes
+writable = yes
+guest ok = yes
+read only = no
+
+At this point, the smb.conf file should look like this:
+
+[global]
+workgroup = WORKGROUP
+server string = Samba Server %v
+netbios name = srvr1
+security = user
+map to guest = bad user
+name resolve order = bcast host
+dns proxy = no
+#================= Share Definitions ==========================
+[AllAccess]
+path = /Samba/Allaccess
+browsable =yes
+writable = yes
+guest ok = yes
+read only = no
+
+Restart Samba and test the first share.
+
+sudo service smbd restart
+
+When you browse with Windows File Explorer, you’ll see the first share.
+ubuntu samba file share
+
+Next, go and secure the Secure folder so that only member of a group will be able to access it.
+
+First create a secure group on Ubuntu by running the commands below:
+
+sudo addgroup securedgroup
+
+Then secure the Secure folder by making richard the owner and give securedgroup members access
+
+cd /Samba/Allaccess
+sudo chown -R richard:securedgroup Secure/
+sudo chmod -R 0770 Secure/
+
+With the settings above, only the account named richard and members of of securedgroup will access the Secure folder inside /Samba/Allaccess
+
+Next, go to the Samba config file again and create the Secure share. Copy and paste the block in the file below the other blocks.
+
+sudo nano /etc/samba/smb.conf
+
+Copy and paste the block code below into the file and save.
+
+[Secure]
+path = /Samba/Allaccess/Secure
+valid users = @securedgroup
+guest ok = no
+writable = yes
+browsable = yes
+
+Save the file, restart Samba and you’re done. If an account isn’t a member of the securedgroup, access will be denied.
+ubuntu samba access rights
+
+To add an account to the secure group, run the commands below.
+
+sudo usermod -a -G securedgroup richard
+
+Then add the account to Samba database for access. You’ll be prompted to create a new password for Samba. Do it. You must always add the user account to Samba database before access is granted. Do it by running the commands below.
+
+sudo smbpasswd -a richard
+
+Restart Samba and try again with the user account richard again. This time access will be granted. If Windows prompts, type the account name and password to access the shared folder.
+
+That’s it! Hope this helps!
+
+You may also like this:
